@@ -1,5 +1,5 @@
 # CSharp
-```cpp
+```txt
 CSharp-Learning/
 │
 ├── README.md
