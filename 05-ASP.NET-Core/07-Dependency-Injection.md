@@ -324,7 +324,6 @@ class EmailService : INotificationService
 ```
 
 # How DI Works | WorkFlow
-হ্যাঁ—তোমার confusion-টা আসলে **DI Container-এর সবচেয়ে important অংশ**। এই লাইনটা:
 
 ```csharp
 var notificationService =
