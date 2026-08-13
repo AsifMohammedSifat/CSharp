@@ -323,6 +323,475 @@ class EmailService : INotificationService
 }
 ```
 
+# How DI Works | WorkFlow
+হ্যাঁ—তোমার confusion-টা আসলে **DI Container-এর সবচেয়ে important অংশ**। এই লাইনটা:
+
+```csharp
+var notificationService =
+    serviceProvider.GetRequiredService<NotificationService>();
+```
+
+দেখতে মনে হয় শুধু একটা object চাওয়া হচ্ছে। কিন্তু **behind the scene অনেকগুলো step হচ্ছে**।
+
+তোমার দেওয়া code অনুযায়ী `NotificationService` registered আছে এবং তার constructor-এ `INotificationService` লাগে। 
+
+---
+
+# প্রথমে পুরো picture
+
+তোমার code:
+
+```csharp
+var services = new ServiceCollection();
+
+services.AddTransient<NotificationService>();
+services.AddTransient<INotificationService, EmailService>();
+
+var serviceProvider = services.BuildServiceProvider();
+
+var notificationService =
+    serviceProvider.GetRequiredService<NotificationService>();
+```
+
+এখানে **তুমি `new NotificationService(...)` লিখোনি**।
+
+তাহলে প্রশ্ন:
+
+> তাহলে `NotificationService` object বানালো কে?
+
+**Answer: `serviceProvider` / DI Container।**
+
+---
+
+# Step 1 — Registration-এর সময় object তৈরি হচ্ছে না
+
+এই লাইন:
+
+```csharp
+services.AddTransient<NotificationService>();
+```
+
+মানে কিন্তু:
+
+```csharp
+new NotificationService();
+```
+
+না।
+
+বরং Container-কে বলা হচ্ছে:
+
+> "ভবিষ্যতে যদি কেউ `NotificationService` চায়, তখন তুমি এটা তৈরি করে দেবে।"
+
+আর:
+
+```csharp
+services.AddTransient<INotificationService, EmailService>();
+```
+
+মানে:
+
+> "কেউ যদি `INotificationService` চায়, তাকে `EmailService` implementation দেবে।"
+
+তোমার notes-এও `ServiceCollection`-কে registration list হিসেবে এবং `AddTransient`-কে registration হিসেবে দেখানো হয়েছে। 
+
+তখন Container-এর ভিতরে roughly এমন information আছে:
+
+```text
+DI Container
+│
+├── NotificationService
+│      └── Lifetime = Transient
+│
+└── INotificationService
+       └── Implementation = EmailService
+       └── Lifetime = Transient
+```
+
+এখনো **কোনো object তৈরি হয়নি**।
+
+---
+
+# Step 2 — `BuildServiceProvider()`
+
+এই লাইন:
+
+```csharp
+var serviceProvider = services.BuildServiceProvider();
+```
+
+এর মাধ্যমে registration list থেকে একটা **ServiceProvider/Container** তৈরি হলো।
+
+তখন roughly:
+
+```text
+ServiceProvider
+      │
+      ├── NotificationService → Transient
+      │
+      └── INotificationService → EmailService → Transient
+```
+
+তোমার code-এর ভাষায় `BuildServiceProvider()` registration list থেকে এমন একটা container তৈরি করে যেটা পরে object supply করতে পারে। 
+
+---
+
+# Step 3 — এখন আসল magic 😄
+
+তুমি লিখলে:
+
+```csharp
+serviceProvider.GetRequiredService<NotificationService>();
+```
+
+এখানে Container-কে তুমি বলছো:
+
+> **"আমাকে একটা `NotificationService` object দাও।"**
+
+এখন Container প্রথমে দেখে:
+
+```text
+আমি কি NotificationService-এর registration জানি?
+```
+
+উত্তর:
+
+```text
+YES ✅
+```
+
+কারণ আগে লিখেছিলে:
+
+```csharp
+services.AddTransient<NotificationService>();
+```
+
+---
+
+# Step 4 — Container `NotificationService`-এর constructor দেখে
+
+তোমার class:
+
+```csharp
+class NotificationService(INotificationService service)
+{
+    public void NotifyUser(string to, string message)
+    {
+        service.sendMessage(to, message);
+    }
+}
+```
+
+এটার constructor logically এমন:
+
+```csharp
+public NotificationService(INotificationService service)
+{
+    this.service = service;
+}
+```
+
+Container Reflection ব্যবহার করে constructor দেখে:
+
+```text
+NotificationService
+        │
+        ↓
+Constructor
+        │
+        ↓
+Needs INotificationService
+```
+
+তোমার custom DI container-এ ঠিক এই concept দেখানো আছে—`GetConstructors()` দিয়ে constructor বের করে এবং `GetParameters()` দিয়ে constructor-এর dependency বের করে। 
+
+---
+
+# Step 5 — এখন Container-এর নতুন প্রশ্ন
+
+Container বলবে:
+
+> "`NotificationService` বানাতে আমার `INotificationService` লাগবে।"
+
+তাই সে internally আবার resolve করবে:
+
+```csharp
+GetRequiredService<INotificationService>()
+```
+
+অর্থাৎ:
+
+```text
+GetRequiredService<NotificationService>()
+             │
+             ↓
+NotificationService-এর constructor দেখল
+             │
+             ↓
+প্রয়োজন: INotificationService
+             │
+             ↓
+Get INotificationService
+```
+
+---
+
+# Step 6 — `INotificationService` এর জন্য কী আছে?
+
+তুমি registration করেছিলে:
+
+```csharp
+services.AddTransient<INotificationService, EmailService>();
+```
+
+Container জানে:
+
+```text
+INotificationService
+        ↓
+EmailService
+```
+
+অর্থাৎ:
+
+> "`INotificationService` চাইলে `EmailService` বানিয়ে দাও।"
+
+---
+
+# Step 7 — এখন EmailService তৈরি হবে
+
+Container internally conceptually করে:
+
+```csharp
+var emailService = new EmailService();
+```
+
+এটা **তুমি লেখোনি**।
+
+DI Container internally object creation করছে।
+
+তারপর:
+
+```text
+emailService
+      │
+      ↓
+INotificationService
+```
+
+কারণ:
+
+```csharp
+EmailService : INotificationService
+```
+
+---
+
+# Step 8 — এবার NotificationService তৈরি
+
+এখন Container-এর কাছে dependency ready:
+
+```text
+emailService
+```
+
+তাই logically সে করে:
+
+```csharp
+var notificationService =
+    new NotificationService(emailService);
+```
+
+🔥 **এই জায়গাটাই তোমার সবচেয়ে important visualization।**
+
+তুমি লিখেছ:
+
+```csharp
+serviceProvider.GetRequiredService<NotificationService>();
+```
+
+কিন্তু internally conceptually হচ্ছে:
+
+```csharp
+var emailService = new EmailService();
+
+var notificationService =
+    new NotificationService(emailService);
+
+return notificationService;
+```
+
+---
+
+# পুরো process একসাথে দেখো
+
+```text
+serviceProvider
+       │
+       │
+       │ GetRequiredService<NotificationService>()
+       ↓
+┌───────────────────────────────┐
+│ DI Container                  │
+│                               │
+│ NotificationService registered│
+└───────────────┬───────────────┘
+                │
+                ↓
+   Constructor inspect করে
+                │
+                ↓
+       Needs INotificationService
+                │
+                ↓
+┌───────────────────────────────┐
+│ Registration                  │
+│                               │
+│ INotificationService          │
+│          ↓                    │
+│      EmailService             │
+└───────────────┬───────────────┘
+                │
+                ↓
+      new EmailService()
+                │
+                ↓
+       EmailService object
+                │
+                ↓
+new NotificationService(emailService)
+                │
+                ↓
+   NotificationService object
+                │
+                ↓
+         return object
+                │
+                ↓
+var notificationService = ...
+```
+
+---
+
+# তাহলে তোমার variable-এ কী আসে?
+
+এই লাইন:
+
+```csharp
+var notificationService =
+    serviceProvider.GetRequiredService<NotificationService>();
+```
+
+শেষ হওয়ার পরে memory-তে roughly:
+
+```text
+notificationService
+       │
+       ▼
+┌──────────────────────────┐
+│ NotificationService      │
+│                          │
+│ service ─────────────┐   │
+└──────────────────────┼───┘
+                       │
+                       ▼
+              ┌─────────────────┐
+              │ EmailService    │
+              │                 │
+              │ sendMessage()   │
+              └─────────────────┘
+```
+
+অর্থাৎ:
+
+```csharp
+notificationService
+```
+
+এর ভিতরে `INotificationService service` হিসেবে একটা **EmailService object** আছে।
+
+---
+
+# এরপর তুমি যখন করো
+
+```csharp
+notificationService.NotifyUser(
+    "a@gmail.com",
+    "hello"
+);
+```
+
+তখন:
+
+```text
+notificationService
+        │
+        ↓
+NotifyUser()
+        │
+        ↓
+service.sendMessage()
+        │
+        ↓
+EmailService.sendMessage()
+        │
+        ↓
+Console.WriteLine()
+```
+
+অর্থাৎ final output:
+
+```text
+Sending hello to a@gmail.com
+```
+
+---
+
+# সবচেয়ে গুরুত্বপূর্ণ: এটা Magic না
+
+DI Container আসলে মোটামুটি এই কাজটাই করছে:
+
+### তুমি manually করলে:
+
+```csharp
+var emailService = new EmailService();
+
+var notificationService =
+    new NotificationService(emailService);
+```
+
+### DI Container ব্যবহার করলে:
+
+```csharp
+var notificationService =
+    serviceProvider.GetRequiredService<NotificationService>();
+```
+
+**Difference হলো:** দ্বিতীয় ক্ষেত্রে `new` করার দায়িত্ব তোমার বদলে **DI Container নিয়েছে**।
+
+তোমার নিজের বানানো Mini DI Container-এ এই কাজটা খুব সুন্দরভাবে দেখা যায়:
+
+```csharp
+var ctor = implType.GetConstructors().First();
+
+var deps = ctor.GetParameters()
+    .Select(p => GetService(p.ParameterType))
+    .ToArray();
+
+return Activator.CreateInstance(implType, deps)!;
+```
+
+এই অংশটাই basically বলে:
+
+> **Constructor খুঁজো → constructor-এর dependency খুঁজো → dependency তৈরি করো → তারপর মূল object তৈরি করো।** 
+
+### একটা sentence মনে রাখো:
+
+> **`GetRequiredService<T>()` মানে শুধু "object বের করে দাও" না; DI Container-এর কাছে এটা হলো "T কীভাবে তৈরি করতে হবে সেটা বের করো, তার সব dependency recursively তৈরি করো, তারপর T-এর object আমাকে দাও।"**
+
+এটাই `GetRequiredService<NotificationService>()`-এর **behind the scene**।
+
+
 ### এখানে যা যা শেখা হলো
 | ধাপ | ব্যাখ্যা |
 |---|---|
