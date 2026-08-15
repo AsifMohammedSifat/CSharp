@@ -4,7 +4,7 @@
 
 **Middleware** হলো এমন একটা সফটওয়্যার কম্পোনেন্ট (একটা ছোট class বা function) যা **HTTP request এবং response** কে হ্যান্ডেল করার জন্য একটার পর একটা **pipeline** বা লাইনে সাজানো থাকে।
 
-<img width="2041" height="770" alt="image" src="https://github.com/user-attachments/assets/060fc975-cd9c-4716-ab51-5e5a69e1a962" />
+<img width="1793" height="877" alt="image" src="https://github.com/user-attachments/assets/45959117-900d-4792-8145-e7a7905695de" />
 
 
 সহজ ভাষায় বলতে গেলে —
@@ -86,48 +86,6 @@ app.Run();
 ```
 > এখানে `Use...()` মেথডগুলোর order (ক্রম) খুবই গুরুত্বপূর্ণ, কারণ pipeline ঠিক এই ক্রম অনুযায়ীই চলে।
 
-### Custom Middleware (Inline)
-```csharp
-app.Use(async (context, next) =>
-{
-    // Process Request
-    Console.WriteLine("Request আসছে: " + context.Request.Path);
-
-    await next(); // পরের middleware-কে কল করা হচ্ছে
-
-    // Process Response
-    Console.WriteLine("Response পাঠানো হচ্ছে: " + context.Response.StatusCode);
-});
-```
-
-### Custom Middleware (Class হিসেবে — বাস্তব প্রজেক্টে যেভাবে করা হয়)
-```csharp
-public class LoggingMiddleware
-{
-    private readonly RequestDelegate _next;
-
-    public LoggingMiddleware(RequestDelegate next)
-    {
-        _next = next;
-    }
-
-    public async Task InvokeAsync(HttpContext context)
-    {
-        // Process Request
-        Console.WriteLine($"Request শুরু: {context.Request.Path}");
-
-        await _next(context); // next middleware কল হচ্ছে
-
-        // Process Response
-        Console.WriteLine($"Response শেষ: {context.Response.StatusCode}");
-    }
-}
-```
-এবং `Program.cs`-এ এটাকে যুক্ত করতে হয়:
-```csharp
-app.UseMiddleware<LoggingMiddleware>();
-```
-
 ---
 
 ## ৫. গুরুত্বপূর্ণ পয়েন্ট (Key Points — মনে রাখার মতো)
@@ -153,13 +111,6 @@ app.UseMiddleware<LoggingMiddleware>();
 - **Static Files Middleware** — CSS, JS, image ইত্যাদি ফাইল সরাসরি সার্ভ করে।
 
 ---
-
-## ৭. সারাংশ (Summary)
-
-- Middleware হলো ASP.NET Core-এর একটা **pipeline-based architecture**, যেখানে request একটার পর একটা component এর মধ্য দিয়ে পার হয়।
-- প্রতিটা middleware **request process** করে, তারপর `next()` দিয়ে পরের middleware-কে call করে, এবং সবশেষে **response process** করে ফেরত পাঠায়।
-- **Kestrel** সার্ভার Browser আর Middleware Pipeline-এর মধ্যে সেতুবন্ধন (bridge) হিসেবে কাজ করে, এবং **HttpContext** পুরো প্রসেসের central object।
-
 ## Visualization
 <img width="626" height="164" alt="image" src="https://github.com/user-attachments/assets/da8bd595-3d0b-4523-8b54-9900e494e167" />
 এবার একটা middleware-এর ভেতরে ঢুকে দেখা যাক — Process Request → next() → Process Response এই তিনটা ধাপ ঠিক কীভাবে কাজ করে:
@@ -168,5 +119,3 @@ app.UseMiddleware<LoggingMiddleware>();
 সংক্ষেপে ছবি দুটোর মানে:
 - প্রথম ডায়াগ্রামে দেখা যাচ্ছে — Browser থেকে request Kestrel-এ যায়, Kestrel সেটা HttpContext আকারে Middleware Pipeline-এ পাঠায়, যেখানে 1 → 2 → 3 ক্রমে middleware-গুলো কাজ করে।
 - দ্বিতীয় ডায়াগ্রামে একটা মাত্র middleware (এখানে Middleware 2) জুম করে দেখানো হয়েছে — এটা আগে request প্রসেস করে, তারপর `next()` কল করে পরের middleware-কে (Middleware 3) কাজ চালিয়ে যেতে দেয়, আর সেটা response ফেরত দিলে middleware আবার response প্রসেস করে (dashed তীর দিয়ে দেখানো হয়েছে ফেরার পথ)।
-
-কোনো বক্সে ক্লিক করলে সেই অংশ নিয়ে আরও ব্যাখ্যা চাইতে পারেন। আগের markdown নোট ফাইলটাতেও এই একই ফ্লো লেখায় ব্যাখ্যা করা আছে, চাইলে দুটো একসাথে মিলিয়ে পড়তে পারেন।
