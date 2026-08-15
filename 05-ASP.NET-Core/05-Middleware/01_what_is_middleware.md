@@ -4,6 +4,9 @@
 
 **Middleware** হলো এমন একটা সফটওয়্যার কম্পোনেন্ট (একটা ছোট class বা function) যা **HTTP request এবং response** কে হ্যান্ডেল করার জন্য একটার পর একটা **pipeline** বা লাইনে সাজানো থাকে।
 
+<img width="2041" height="770" alt="image" src="https://github.com/user-attachments/assets/060fc975-cd9c-4716-ab51-5e5a69e1a962" />
+
+
 সহজ ভাষায় বলতে গেলে —
 - Browser থেকে একটা **request** আসে।
 - সেই request টা কয়েকটা ধাপ (middleware) পার হয়ে **response** হিসেবে আবার Browser-এ ফিরে যায়।
