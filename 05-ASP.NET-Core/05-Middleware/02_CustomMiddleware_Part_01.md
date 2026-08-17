@@ -1,7 +1,4 @@
 # ASP.NET Core-এ নিজের Middleware ও Pipeline বানানো
-
-> এই নোটটা মূল ভার্সনের একটা পরিষ্কার, bug-fixed এবং একটু বেশি ব্যাখ্যা-সহ version। কোডের typo গুলো ঠিক করা হয়েছে (যেমন `MiddlwareDelegate` → `MiddlewareDelegate`), এবং শেষে ASP.NET Core-এর আসল pipeline-এর সাথে তুলনা যোগ করা হয়েছে।
-
 ---
 
 ## 1. প্রথমে Project তৈরি করা
