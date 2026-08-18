@@ -1,4 +1,7 @@
 # TCP দিয়ে HTTP Server বানানো — .NET, Kestrel, TCP, HTTP Fundamentals
+<img width="998" height="439" alt="image" src="https://github.com/user-attachments/assets/56b65ee9-72cb-4390-843b-8302560d82f3" />
+<img width="1117" height="468" alt="image" src="https://github.com/user-attachments/assets/6c823013-824f-4fae-937e-b0c17c9383ca" />
+
 
 # Program.cs
 ```csharp
